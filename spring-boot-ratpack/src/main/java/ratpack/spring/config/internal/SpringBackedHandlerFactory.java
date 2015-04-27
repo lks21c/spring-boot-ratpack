@@ -16,18 +16,15 @@
 
 package ratpack.spring.config.internal;
 
-import org.springframework.context.ApplicationContext;
-
 import ratpack.func.Action;
+import ratpack.func.Function;
 import ratpack.guice.BindingsSpec;
 import ratpack.guice.Guice;
 import ratpack.handling.Handler;
 import ratpack.handling.Handlers;
 import ratpack.handling.internal.ClientErrorForwardingHandler;
-import ratpack.launch.HandlerFactory;
-import ratpack.launch.LaunchConfig;
 import ratpack.registry.Registry;
-import ratpack.spring.Spring;
+import ratpack.server.ServerConfig;
 import ratpack.spring.groovy.internal.RatpackScriptActionFactory;
 
 import com.google.inject.Module;
@@ -36,25 +33,21 @@ import com.google.inject.Module;
  * @author Dave Syer
  * 
  */
-public class SpringBackedHandlerFactory implements HandlerFactory {
-
-	private ApplicationContext context;
-
-	public SpringBackedHandlerFactory(ApplicationContext context) {
-		this.context = context;
-	}
+public class SpringBackedHandlerFactory implements Function<Registry, Handler> {
 
 	@Override
-	public Handler create(LaunchConfig launchConfig) throws Exception {
-		Registry registry = Spring.spring(context);
-		Action<BindingsSpec> action = registry.get(RatpackScriptActionFactory.class).getBindings();
-		Handler handler = Guice.builder(launchConfig).bindings(bindings -> {
+	public Handler apply(Registry registry) throws Exception {
+		Action<BindingsSpec> action = registry.get(RatpackScriptActionFactory.class)
+				.getBindings();
+		Registry guice = Guice.registry(bindings -> {
 			for (Module module : registry.getAll(Module.class)) {
 				bindings.add(module);
 			}
 			action.execute(bindings);
-		}).build(registry.get(ChainConfigurers.class));
-		return Handlers.chain(Handlers.register(registry, handler),
+		}).apply(registry);
+		return Handlers.chain(
+				Handlers.chain(registry.get(ServerConfig.class), guice,
+						registry.get(ChainConfigurers.class)),
 				new ClientErrorForwardingHandler(404));
 	}
 

@@ -60,6 +60,10 @@ public class RatpackScriptActionFactory {
 			this.bindingsConfigurer = bindingsConfigurer;
 		}
 
+		@Override
+		public void serverConfig(Closure<?> configurer) {
+		}
+
 	}
 
 	public List<Action<Chain>> getHandlerActions() {

@@ -27,12 +27,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
-import ratpack.launch.LaunchConfig;
-import ratpack.launch.LaunchConfigBuilder;
 import ratpack.server.RatpackServer;
-import ratpack.server.RatpackServerBuilder;
+import ratpack.server.ServerConfig;
+import ratpack.spring.Spring;
 import ratpack.spring.config.internal.ChainConfigurers;
 import ratpack.spring.config.internal.SpringBackedHandlerFactory;
+import ratpack.spring.groovy.internal.RatpackScriptActionFactory;
 
 /**
  * @author Dave Syer
@@ -64,9 +64,9 @@ public class RatpackConfiguration implements CommandLineRunner {
 
 		@Bean
 		@ConditionalOnMissingBean
-		public LaunchConfig ratpackLaunchConfig(ApplicationContext context) {
+		public ServerConfig ratpackLaunchConfig(ApplicationContext context) {
 			// @formatter:off
-			LaunchConfigBuilder builder = LaunchConfigBuilder
+			ServerConfig.Builder builder = ServerConfig
 					.baseDir(ratpack.getBasepath())
 					.address(ratpack.getAddress())
 					.threads(ratpack.getMaxThreads());
@@ -74,9 +74,8 @@ public class RatpackConfiguration implements CommandLineRunner {
 			if (ratpack.getPort() != null) {
 				builder.port(ratpack.getPort());
 			}
-			return builder.build(new SpringBackedHandlerFactory(context));
+			return builder.build();
 		}
-
 	}
 
 	@Configuration
@@ -84,14 +83,18 @@ public class RatpackConfiguration implements CommandLineRunner {
 	protected static class ServerConfiguration {
 
 		@Autowired
-		private LaunchConfig launchConfig;
+		private ServerConfig launchConfig;
 
 		@Bean
-		public RatpackServer ratpackServer() {
-			RatpackServer server = RatpackServerBuilder.build(launchConfig);
+		public RatpackServer ratpackServer(RatpackScriptActionFactory factory,
+				ApplicationContext context) throws Exception {
+			RatpackServer server = RatpackServer.of(spec -> {
+				spec.registry(Spring.spring(context)).serverConfig(launchConfig)
+						.handler(new SpringBackedHandlerFactory());
+			});
 			return server;
 		}
-		
+
 	}
 
 }
